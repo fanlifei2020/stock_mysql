@@ -40,7 +40,7 @@ sql = """
 df = pd.read_sql(sql, engine)
 
 sql2 = '''
-   CREATE TABLE IF NOT EXISTS `unique_table`(
+   CREATE TABLE IF NOT EXISTS `unique_stock`(
        `ts_code` varchar(20) NOT NULL,
        `trade_date` varchar(8) NOT NULL,
        `open` decimal(6,2) NOT NULL,
@@ -63,15 +63,15 @@ df2 = df.groupby('trade_date',as_index=False).apply(lambda t: t[t.limit_amount==
 df2.reset_index(drop=True, inplace=True)
 #去除有多个并列的，只留唯一标的
 df2.drop_duplicates(subset='trade_date',keep=False,inplace=True)
-df2.to_sql('unique_table',engine,if_exists='append',index=False)
+df2.to_sql('unique_table',engine,if_exists='replace',index=False)
 
 sql = """
-   select * from unique_table;
+   select * from unique_stock;
 """
 df = pd.read_sql(sql, engine)
 
 sql3 = '''
-   CREATE TABLE IF NOT EXISTS `unique_table_all`(
+   CREATE TABLE IF NOT EXISTS `unique_stock_result`(
        `ts_code` varchar(20) NOT NULL,
        `trade_date` varchar(8) NOT NULL,
        `open` decimal(6,2) NOT NULL,
@@ -462,8 +462,8 @@ def get_guxing(series):
 def test():
     pass
 
- 
-
+df['open_profit'] = df.apply(get_open_profit,axis=1)
+df['open_price'] = df.apply(get_open_price,axis=1)
 
 # In[4]:
 
@@ -502,7 +502,7 @@ df['guxing'] = df.apply(get_guxing,axis=1)
 # In[13]:
 
 
-df.to_sql('unique_table_all',engine,if_exists='append',index=False)
+df.to_sql('unique_stock_result',engine,if_exists='append',index=False)
 
 
 # In[ ]:
