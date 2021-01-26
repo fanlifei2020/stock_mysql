@@ -63,7 +63,7 @@ df2 = df.groupby('trade_date',as_index=False).apply(lambda t: t[t.limit_amount==
 df2.reset_index(drop=True, inplace=True)
 #去除有多个并列的，只留唯一标的
 df2.drop_duplicates(subset='trade_date',keep=False,inplace=True)
-df2.to_sql('unique_table',engine,if_exists='replace',index=False)
+df2.to_sql('unique_stock',engine,if_exists='replace',index=False)
 
 sql = """
    select * from unique_stock;
