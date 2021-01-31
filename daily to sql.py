@@ -68,10 +68,18 @@ with engine.connect() as con:
 
 # In[21]:
 
-
+"""
+数据库导入
 sql = "select * from trade_days;"
 trade_day = pd.read_sql(sql,engine)
 trade_day = trade_day['day'].to_list()
+"""
+#tushare导入
+trade_day = pro.trade_cal(exchange='', start_date='20040601',end_date=today)
+trade_day = trade_day.loc[trade_day['is_open']==1,:]
+trade_day = trade_day[['cal_date']]
+trade_day = trade_day['cal_date'].tolist()
+
 
 
 # In[22]:
