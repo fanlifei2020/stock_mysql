@@ -412,6 +412,38 @@ def get_open_profit(series):
     #print('盈利率：' ,rate)
     return rate
 
+def get_open_rate(series):
+
+    df = pro.daily(ts_code=series['ts_code'], start_date=series['trade_date']) 
+    df = df[:-1]
+    df = df.tail(15)
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+   # print('\n')
+    print(series['trade_date'],end=',')
+    pct = series['pct_chg']
+    buy_price = 0
+    sell_price = 0
+    #print(df.iloc[0,:]['trade_date'])
+    #涨停的第二天
+    if pct < 10.1:#10点封顶的股票
+        if df.iloc[0,:]['open']<df.iloc[0,:]['pre_close']*1.092:
+            #print("非一字开盘")
+            buy_price = df.iloc[0,:]['open']
+            #print('买入open价格at ',buy_price)
+        else:
+            #print('一字开盘，无买点，退出')
+            return np.nan
+    else:#20点封顶的股票
+        if df.iloc[0,:]['open']<df.iloc[0,:]['pre_close']*1.192:
+            #print("非一字开盘")
+            buy_price = df.iloc[0,:]['open']
+            #print('买入open价格at ',buy_price)
+        else:
+            #print('一字开盘，无买点，退出')
+            return np.nan
+    rate = (buy_price-series['close'])/series['close']*100
+    return roung(rate,2)
+   
 def get_open_price(series):
 
     df = pro.daily(ts_code=series['ts_code'], start_date=series['trade_date']) 
@@ -468,9 +500,7 @@ df['open_price'] = df.apply(get_open_price,axis=1)
 # In[4]:
 
 
-#添加open_rate
-df['open_rate'] = (df['open_price'] - df['close'])/df['close']*100
-df['open_rate'] = df['open_rate'].round(2)
+ 
 #去除除权造成的错误情况
 df = df.loc[(df['open_profit']>-60)|(df['open_rate']>-11),:]
 
