@@ -1,0 +1,53 @@
+def get_grid(series):
+    '''竞价，-3卖出或尾盘卖出，涨停跌停不卖'''
+    #以前用tail(16).head(15)直接去除涨停当天，当不满15条时会失效
+    df = pro.daily(ts_code=series['ts_code'], start_date=series['trade_date']) 
+    df = df.tail(20)
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+    high = df.iloc[0,:]['high']
+    #print(high)
+    #print('\n')
+    #print(df)
+    #print("**********************")
+    print(series['trade_date'],end=",")
+    #print(series['ts_code'])
+    pct = series['pct_chg']
+    buy_price = 0
+    sell_price = 0
+    #print(df.iloc[0,:]['trade_date'])
+    #涨停的第二天
+     
+    
+    for index,row in df.iterrows():
+        #print("日期：",row['trade_date'])
+        if buy_price == 0:
+            #print("buy_price:",buy_price)
+            if row['high']>high:
+                #print("high更新:",row['high'])
+                high = row['high']
+            if row['low'] < high*0.8:
+                if row['high']>high*0.8:
+                    #print('触及-20点的买点,买入,',high*0.8)
+                    buy_price = high*0.8
+                else:
+                    #print('低开直接低于-20点的买点,买入,',row['high'])
+                    buy_price = row['high']
+        else:
+            #print('start to sell')
+            if row['high']>buy_price*1.1:
+                #print('触及10个点卖点，卖出')
+                sell_price = buy_price*1.1
+                break
+                
+            """if row['low']<buy_price*0.9:
+                #print('触及止损，割肉')
+                sell_price = buy_price*0.9
+                break"""
+    if buy_price == 0:
+        return np.nan
+    if sell_price == 0:
+        sell_price = df.iloc[-1,:]['close']
+        #return np.nan
+    rate = (sell_price - buy_price)/buy_price*100 - 2
+    #print(rate)
+    return round(rate,2)
