@@ -1,0 +1,20 @@
+temp= pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol'\
+                                ,'amount','limit_amount','open_profit'])
+ 
+#保留最高板
+temp.append(df.iloc[0,:])
+last_row = df.iloc[0,:]
+for index,row in df.iterrows():
+    if row['ts_code'] != last_row['ts_code']:
+        temp = temp.append(last_row)
+    last_row = row
+    
+    
+#连续涨停的唯一，保留第一板
+flag = ""
+for index,row in df.iterrows():
+    if row['ts_code'] != flag:
+        temp_df = temp_df.append(row)
+        flag = row['ts_code']
+    else:
+        continue
