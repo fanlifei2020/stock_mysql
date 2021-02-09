@@ -1,0 +1,52 @@
+def hui_tiao(series):
+    """考虑一波后回调没有大小阴组合，直接找二波后的大小阴组合.放量缩量的判断，大小阴时间间隔的判断。加入第一次组合没成功，再来个缩量阴的实验"""
+    df = pro.daily(ts_code=series['ts_code'], start_date=series['trade_date']) 
+    df = df[:-1]
+    df = df.tail(30)
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+    
+    flag = 0
+    for index,row in df.iterows():
+        if flag==0:
+            if row['close']<(row['open']-row['pre_close']*0.1):
+                print("得到大阴")
+                first_close = row['close']
+                first_amount = row['amount']
+                high = row['high']
+                flag = 1
+                continue
+        if flag==1:
+            if row['high']>high:
+                print("大小阴组合没出现，就出现了上攻，返回nan")
+                return np.nan
+            if row['close']<row['open'] and (row['close']>(row['open'] - row['pre_close']*0.05)) \
+            and (row['close']<first_close) and (row['amount']<first_amount):
+                print("得到小阴")
+                flag = 2
+            continue
+        if  flag==2:
+            buy_price = row['open']
+            print('竞价买入')
+            flag = 3
+            continue
+        if flag==3:
+            if row['open']>buy_price*1.1:
+                print("止盈")
+                sell_price = row['open']
+                break
+            if row['high']>buy_price*1.1:
+                print("止盈2")
+                sell_price = buy_price*1.1
+                break
+            if row['open']<buy_price*0.9:
+                print("止损")
+                sell_price = row['open']
+                break
+            if row['low'] <buy_price*0.9:
+                print("止损2")
+                sell_price = buy_price*0.9
+                break
+                
+    rate = (ell_price - buy_price)/buy_price*100
+    return round(rate,2)
+            
