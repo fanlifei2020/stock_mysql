@@ -1,0 +1,180 @@
+
+
+"""
+10 5、7 5  上攻判定，阴线的时间窗口，都是可调参数，尝试止损后的再介入
+"""
+#%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import tushare as ts
+from time import sleep
+from sqlalchemy import create_engine
+import sqlalchemy
+import pymysql
+import os
+import datetime
+
+#得到当天日期
+today=datetime.date.today()
+formatted_today=today.strftime('%y%m%d')
+today = '20' + formatted_today
+
+pro = ts.pro_api('7d1f3465439683e262b5b06a8aaefa886ea48aafe2cda73c130beb97')
+#df = pro.trade_cal(exchange='', start_date='20180101', end_date='20181231')
+#data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
+#df = pro.daily(ts_code='000001.SZ,600000.SH', start_date='20180701', end_date='20180718')
+#df = pro.daily(trade_date='20180810')
+
+def hui_tiao(series):
+    """考虑一波后回调没有大小阴组合，直接找二波后的大小阴组合.放量缩量的判断，大小阴时间间隔的判断。加入第一次组合没成功，再来个缩量阴的实验"""
+    df = pro.daily(ts_code=series['ts_code'], start_date=series['trade_date']) 
+    df = df[:-1]
+    df = df.tail(30)
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+    
+    print("*************")
+    print(series['ts_code'])
+    
+    flag = 0
+    buy_price = 0
+    sell_price = 0
+    for index,row in df.iterrows():
+        print(row['trade_date'],end="----")
+        if flag==0:
+            print("flag = 0",end=",")
+            if row['close']<(row['open']-row['pre_close']*0.07):
+                print("得到大阴")
+                first_close = row['close']
+                first_amount = row['amount']
+                high = row['high']
+                flag = 1
+                continue
+        if flag==1:
+            if row['high']>high:
+                print("大小阴组合没出现，就出现了上攻，返回nan")
+                return np.nan
+            if row['close']<row['open'] and (row['close']>(row['open'] - row['pre_close']*0.05)) \
+            and (row['close']<=first_close) and (row['amount']<first_amount):
+                print("得到小阴")
+                flag = 2
+            continue
+        if  flag==2:
+            buy_price = row['open']
+            print('竞价买入')
+            flag = 3
+            continue
+        if flag==3:
+            if row['open']>buy_price*1.1:
+                print("止盈")
+                sell_price = row['open']
+                break
+            if row['high']>buy_price*1.1:
+                print("止盈2")
+                sell_price = buy_price*1.1
+                break
+            if row['open']<buy_price*0.9:
+                print("止损")
+                sell_price = row['open']
+                break
+            if row['low'] <buy_price*0.9:
+                print("止损2")
+                sell_price = buy_price*0.9
+                break
+    
+    if buy_price==0:
+        return np.nan
+    if sell_price == 0:
+        sell_price = df.iloc[-1,:]['close']
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)
+                 
+def test():
+    """考虑一波后回调没有大小阴组合，直接找二波后的大小阴组合.放量缩量的判断，大小阴时间间隔的判断。加入第一次组合没成功，再来个缩量阴的实验"""
+    df = pro.daily(ts_code="600081.SH", start_date="20050228") 
+    df = df[:-1]
+    df = df.tail(30)
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+    
+    print("*************")
+    print(df)
+    print(df.iloc[29,:]['close'])
+    
+    flag = 0
+    buy_price = 0
+    sell_price = 0
+    for index,row in df.iterrows():
+        print(row['trade_date'])
+        if flag==0:
+            if row['close']<(row['open']-row['pre_close']*0.07):
+                print("得到大阴")
+                first_close = row['close']
+                first_amount = row['amount']
+                high = row['high']
+                flag = 1
+                continue
+        if flag==1:
+            if row['high']>high:
+                print("大小阴组合没出现，就出现了上攻，返回nan")
+                return np.nan
+            if row['close']<row['open'] and (row['close']>(row['open'] - row['pre_close']*0.05)) \
+            and (row['close']<first_close) and (row['amount']<first_amount):
+                print("得到小阴")
+                flag = 2
+            continue
+        if  flag==2:
+            buy_price = row['open']
+            print('竞价买入')
+            flag = 3
+            continue
+        if flag==3:
+            if row['open']>buy_price*1.1:
+                print("止盈")
+                sell_price = row['open']
+                break
+            if row['high']>buy_price*1.1:
+                print("止盈2")
+                sell_price = buy_price*1.1
+                break
+            if row['open']<buy_price*0.9:
+                print("止损")
+                sell_price = row['open']
+                break
+            if row['low'] <buy_price*0.9:
+                print("止损2")
+                sell_price = buy_price*0.9
+                break
+    
+    if buy_price==0:
+        return np.nan
+    if sell_price == 0:
+        sell_price = df.iloc[30,:]['close']
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)
+    
+engine = create_engine('mysql+pymysql://root:901113@localhost:3306/stock')
+sql = """
+    select * from unique_stock;
+"""
+df = pd.read_sql(sql, engine)
+temp= pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol'\
+                                ,'amount','limit_amount','open_profit'])
+                                
+'''#连续涨停的唯一，保留第一板
+flag = ""
+for index,row in df.iterrows():
+    if row['ts_code'] != flag:
+        temp_df = temp_df.append(row)
+        flag = row['ts_code']
+    else:
+        continue'''
+
+#取保留最高板
+temp.append(df.iloc[0,:])
+last_row = df.iloc[0,:]
+for index,row in df.iterrows():
+    if row['ts_code'] != last_row['ts_code']:
+        temp = temp.append(last_row)
+    last_row = row
+    
+temp['hui_tiao'] = temp.apply(hui_tiao,axis=1)
