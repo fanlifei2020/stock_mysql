@@ -1,0 +1,61 @@
+
+#%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import tushare as ts
+from time import sleep
+from sqlalchemy import create_engine
+import sqlalchemy
+import pymysql
+import os
+import datetime
+
+#得到当天日期
+today=datetime.date.today()
+formatted_today=today.strftime('%y%m%d')
+today = '20' + formatted_today
+
+pro = ts.pro_api('7d1f3465439683e262b5b06a8aaefa886ea48aafe2cda73c130beb97')
+#df = pro.trade_cal(exchange='', start_date='20180101', end_date='20181231')
+#data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
+#df = pro.daily(ts_code='000001.SZ,600000.SH', start_date='20180701', end_date='20180718')
+#df = pro.daily(trade_date='20180810')
+
+
+# In[2]:
+
+
+
+
+engine = create_engine('mysql+pymysql://root:901113@localhost:3306/stock')
+sql = """
+   select * from zt_amount;
+"""
+df = pd.read_sql(sql, engine)
+
+sql2 = '''
+   CREATE TABLE IF NOT EXISTS `unique_stock`(
+       `ts_code` varchar(20) NOT NULL,
+       `trade_date` varchar(8) NOT NULL,
+       `open` decimal(6,2) NOT NULL,
+       `high` decimal(6,2) NOT NULL,
+       `low` decimal(6,2) NOT NULL,
+       `close` decimal(6,2) NOT NULL,
+       `pre_close` decimal(6,2) NOT NULL,
+       `change` decimal(6,2) NOT NULL,
+       `pct_chg` decimal(6,2) NOT NULL,
+       `vol` decimal(12,2) NOT NULL,
+       `amount` decimal(12,2) NOT NULL,
+       `limit_amount` tinyint unsigned NOT NULL
+       )ENGINE=INNODB DEFAULT CHARSET = utf8;
+'''
+with engine.connect() as con:
+   con.execute(sql2)
+   
+#求得每日最高板
+df2 = df.groupby('trade_date',as_index=False).apply(lambda t: t[t.limit_amount==t.limit_amount.max()])
+df2.reset_index(drop=True, inplace=True)
+#去除有多个并列的，只留唯一标的
+df2.drop_duplicates(subset='trade_date',keep=False,inplace=True)
+df2.to_sql('unique_stock',engine,if_exists='replace',index=False)
