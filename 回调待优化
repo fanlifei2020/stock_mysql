@@ -2,6 +2,7 @@
 
 """
 10 5、7 5  上攻判定，阴线的时间窗口，二阴的缩量程度，都是可调参数，尝试止损后的再介入,板数看看大于2板
+连续两个跌停入，赔率大
 """
 #%matplotlib inline
 import matplotlib.pyplot as plt
