@@ -1,0 +1,20 @@
+def draw_result(df):
+    df = temp
+    df['cumsum'] = temp.hui_tiao.cumsum()
+    top = df['cumsum'].max()+20
+    bottom = df['cumsum'].min()-20
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.figure(figsize=(30,30),dpi=100)
+    date = df['trade_date'].tolist()
+    date = [str(i) for i in date]
+    result = df['cumsum'].tolist()
+    df.reset_index()
+    plt.plot(df.index.values,result)
+    plt.xticks(np.arange(1,len(df),30),date[::30],rotation=45,size=14)
+    plt.yticks(np.arange(bottom,top,10),size=16)
+    fig = plt.gcf()
+    fig.set_size_inches(60,20)
+    plt.grid(ls='--',c='darkblue')
+    plt.savefig("result.jpg")
+    plt.show()
