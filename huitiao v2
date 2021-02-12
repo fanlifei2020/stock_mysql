@@ -1,0 +1,173 @@
+             
+             
+def get_huitiao(ts_code,trade_date):
+    unique_df = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>trade_date),:].head(30)
+    unique_df.reset_index(drop=True,inplace=True)
+    
+    flag = 0
+    buy_price = 0
+    sell_price = 0
+    print("\n")
+    print("*********************")
+    print(ts_code,end=",")
+    print(" zt date:",trade_date)
+    print("set low:",unique_df.iloc[0,:]['low'])
+    low = df.iloc[0,:]['low']
+    for index,row in unique_df.iterrows():
+        print("index:",index)
+        print(row['trade_date'],end="----")
+        if flag==0:
+            print("flag = 0",end=",")
+             
+                
+            if index!=0 and row['high']>low*1.1:
+                print("row high:",row['high'])
+                print("大阴之前，已经上攻10个点以上，退出")
+                return np.nan
+            #low的更新要在判断上攻的后面，确保上攻的最高点和昨天的low相比较，而不是和今天的low相比较，否则大跌也会变成上攻
+            if row['low']<low:
+                print("更新low,",row['low'])
+                low = row['low']
+            if row['close']<(row['open']-row['pre_close']*0.07):
+                print("得到大阴")
+                first_close = row['close']
+                first_amount = row['amount']
+                flag = 1
+                continue
+        if flag==1:
+            if row['low']<low:
+                low = row['low']
+            if row['high']>low*1.1:
+                print("大阴之后，小阴尚未出现，就上攻，返回nan")
+                return np.nan
+            if row['close']<row['open'] and (row['close']>(row['open'] - row['pre_close']*0.05)) \
+            and (row['close']<=first_close) and (row['amount']<first_amount):
+                print("得到小阴")
+                flag = 2
+            continue
+        if  flag==2:
+            buy_price = row['open']
+            print('竞价买入')
+            flag = 3
+            continue
+        if flag==3:
+            if row['open']>buy_price*1.1:
+                print("止盈")
+                sell_price = row['open']
+                break
+            if row['high']>buy_price*1.1:
+                print("止盈2")
+                sell_price = buy_price*1.1
+                break
+            if row['open']<buy_price*0.8:
+                print("止损")
+                sell_price = row['open']
+                break
+            if row['low'] <buy_price*0.8:
+                print("止损2")
+                sell_price = buy_price*0.8
+                break
+    
+    if buy_price==0:
+        return np.nan
+    if sell_price == 0:
+        sell_price = unique_df.iloc[-1,:]['close']
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)
+    
+    
+    
+    
+    def get_huitiao2(ts_code,trade_date):
+    unique_df = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>trade_date),:].head(30)
+    unique_df.reset_index(drop=True,inplace=True)
+    
+    flag = 0
+    buy_price = 0
+    sell_price = 0
+    print("\n")
+    print("*********************")
+    print(ts_code,end=",")
+    print(" zt date:",trade_date)
+    print("set low:",unique_df.iloc[0,:]['low'])
+    low = df.iloc[0,:]['low']
+    for index,row in unique_df.iterrows():
+        print("index:",index)
+        print(row['trade_date'],end="----")
+        if flag==0:
+            print("flag = 0",end=",")
+             
+                
+            
+            if row['close']<(row['open']-row['pre_close']*0.07):
+                print("得到大阴")
+                first_close = row['close']
+                first_amount = row['amount']
+                flag = 1
+                continue
+        if flag==1:
+
+            if row['close']<row['open'] and (row['close']>(row['open'] - row['pre_close']*0.01)) \
+            and (row['close']<=first_close) and (row['amount']<first_amount):
+                print("得到小阴")
+                flag = 2
+            continue
+        if  flag==2:
+            buy_price = row['open']
+            print('竞价买入')
+            flag = 3
+            continue
+        if flag==3:
+            if row['open']>buy_price*1.1:
+                print("止盈")
+                sell_price = row['open']
+                break
+            if row['high']>buy_price*1.1:
+                print("止盈2")
+                sell_price = buy_price*1.1
+                break
+            if row['open']<buy_price*0.9:
+                print("止损")
+                sell_price = row['open']
+                break
+            if row['low'] <buy_price*0.9:
+                print("止损2")
+                sell_price = buy_price*0.9
+                break
+    
+    if buy_price==0:
+        return np.nan
+    if sell_price == 0:
+        sell_price = unique_df.iloc[-1,:]['close']
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)
+    
+    
+    
+    
+    
+    work_df = pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol','amount'])
+    
+    
+    
+    stop = 0 
+for index,row in temp.iterrows():
+    if stop%50 == 0:
+        print("50 arived")
+        if len(work_df)!=0:
+            print("del work_df")
+            del work_df
+        if row['trade_date']<"20201001":
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + \
+            " and trade_date<" + temp.iloc[index+80,:]['trade_date']+";"
+            work_df = pd.read_sql(work_sql,engine)
+        else:
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + ";"
+            work_df = pd.read_sql(work_sql,engine)
+        print('work_df created,length=',len(work_df))
+     
+    result = get_huitiao2(row['ts_code'],row['trade_date'])
+    
+    temp.loc[index,"hui_tiao"] = result
+    print("temp hui_tiao added:",temp.iloc[index,:]['hui_tiao'])
+    stop += 1        
