@@ -1,0 +1,148 @@
+"""目前回测两个跌停后的竞价入
+1.再跌之后的补仓
+2.上涨跌回的平仓，下跌涨回的平仓
+3.时间窗口
+4.竞价入当天涨停，如果第二天跌回买入价，平仓；不设10点止盈价，-3出，如果再涨停，则继续持有
+"""
+#%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import tushare as ts
+from time import sleep
+from sqlalchemy import create_engine
+import sqlalchemy
+import pymysql
+import os
+import datetime
+
+#得到当天日期
+today=datetime.date.today()
+formatted_today=today.strftime('%y%m%d')
+today = '20' + formatted_today
+
+pro = ts.pro_api('7d1f3465439683e262b5b06a8aaefa886ea48aafe2cda73c130beb97')
+#df = pro.trade_cal(exchange='', start_date='20180101', end_date='20181231')
+#data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
+#df = pro.daily(ts_code='000001.SZ,600000.SH', start_date='20180701', end_date='20180718')
+#df = pro.daily(trade_date='20180810')
+
+
+
+
+
+def double_dt(ts_code,trade_date):
+    unique_df = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>trade_date),:].head(30)
+    unique_df.reset_index(drop=True,inplace=True)
+    
+    pre_pct = 0
+    prepre_pct = 0
+    flag = 0
+    buy1 = 0
+    sell_price = 0
+    print("\n")
+    print("*********************")
+    print(ts_code,end=",")
+    print(" zt date:",trade_date)
+    for index,row in unique_df.iterrows():
+        print(row['trade_date'],end=",")
+        if flag == 0:
+            if row['pct_chg']+pre_pct<=-18 and row['pct_chg']+pre_pct>=-22:
+                #-22用来去除除权的情况
+                print("double dt ,start to buy")
+                flag = 1
+                continue
+            else:
+                
+                pre_pct = row['pct_chg']
+                
+                
+        if flag == 1:
+            print("jingjia buy")
+            buy1 = row['open']
+            flag = 2
+            continue
+            """if (row['open']-row['close'])>row['pre_close']*1.05:
+                print("get green ,weipan buy")
+                buy2 = row['close']"""
+        if flag == 2:
+            print("prepare to sell")
+            if row['open']>buy1*1.1:
+                print("止盈")
+                sell_price = row['open']
+                break
+            if row['high']>buy1*1.1:
+                print("止盈")
+                sell_price = buy1*1.1
+                break
+            if row['open']<buy1*0.9:
+                print('止损')
+                sell_price = row['open']
+                break
+            if row['low'] <buy1*0.9:
+                print("止损")
+                sell_price = buy1*0.9
+                break
+            if row['high']>buy1 and row['low']<buy1:
+                print("上涨后跌回,或下跌后涨回")
+                return 0
+            
+                
+    if buy1==0:
+        return np.nan
+    if sell_price == 0:
+        sell_price = unique_df.iloc[-1,:]['close']
+    print("buy1:",buy1)
+    print("sell_price:",sell_price)
+    rate = (sell_price - buy1)/buy1*100
+    print("rate:",rate)
+    return round(rate,2)
+            
+    
+engine = create_engine('mysql+pymysql://root:901113@localhost:3306/stock')
+sql = """
+    select * from unique_stock;
+"""
+df = pd.read_sql(sql, engine)
+
+temp= pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol'\
+                                ,'amount','limit_amount','open_profit'])
+#取保留最高板
+temp.append(df.iloc[0,:])
+last_row = df.iloc[0,:]
+for index,row in df.iterrows():
+    if row['ts_code'] != last_row['ts_code']:
+        temp = temp.append(last_row)
+    last_row = row
+end = len(temp)
+temp.reset_index(drop=True,inplace=True)
+
+
+
+work_df = pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol','amount'])
+stop = 0 
+for index,row in temp.iterrows():
+    if stop%50 == 0:
+        print("50 arived")
+        if len(work_df)!=0:
+            print("del work_df")
+            del work_df
+        if index+80<end:
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + \
+                " and trade_date<" + temp.iloc[index+80,:]['trade_date']+";"
+            work_df = pd.read_sql(work_sql,engine)
+            print("work_df created： index from,",row['trade_date'],end=",")
+            print("index+80:",temp.iloc[index+80,:]['trade_date'])
+     
+        else:
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + \
+                " and trade_date<=" + temp.iloc[end-1,:]['trade_date']+";"
+            work_df = pd.read_sql(work_sql,engine)
+            print("work_df created： index from,",row['trade_date'],end=",")
+            print("index+80:",temp.iloc[end-1,:]['trade_date'])
+     
+    result = double_dt(row['ts_code'],row['trade_date'])
+    print("result",result)
+    temp.loc[index,"double_dt"] = result
+    print("temp double_dt added:", temp.loc[index,"double_dt"] )
+    stop += 1        
