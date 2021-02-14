@@ -84,7 +84,7 @@ def double_dt(ts_code,trade_date):
                 sell_price = buy1*0.9
                 break
             if row['high']>buy1 and row['low']<buy1:
-                print("上涨后跌回,或下跌后涨回")
+                print("上涨后跌回,或下跌后涨回,平仓")
                 return 0
             
                 
