@@ -1,0 +1,50 @@
+df = pro.daily(ts_code=series['ts_code'], start_date=series['trade_date']) 
+df = df[:-1]
+unique_df = df.tail(30)
+unique_df.sort_values(by='trade_date',ascending=True,inplace=True)
+
+
+
+
+
+
+
+
+
+
+
+
+ """ unique_df = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>trade_date),:].head(30)
+    unique_df.reset_index(drop=True,inplace=True)"""
+    
+    
+    
+work_df = pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol','amount'])
+#stop = 0 
+for index,row in temp.iterrows():
+    """if row['trade_date']>"20210101":
+        break
+    if stop%50 == 0:
+        print("50 arived")
+        if len(work_df)!=0:
+            print("del work_df")
+            del work_df
+        if index+80<end:
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + \
+                " and trade_date<" + temp.iloc[index+80,:]['trade_date']+";"
+            work_df = pd.read_sql(work_sql,engine)
+            print("work_df created： index from,",row['trade_date'],end=",")
+            print("index+80:",temp.iloc[index+80,:]['trade_date'])
+     
+        else:
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + \
+                " and trade_date<=" + temp.iloc[end-1,:]['trade_date']+";"
+            work_df = pd.read_sql(work_sql,engine)
+            print("work_df created： index from,",row['trade_date'],end=",")
+            print("index+80:",temp.iloc[end-1,:]['trade_date'])
+     """
+    result = erbo_zt(row['ts_code'],row['trade_date'])
+    print("result",result)
+    temp.loc[index,"erbo_zt"] = result
+    print("temp erbo_zt added:", temp.loc[index,"erbo_zt"] )
+    #stop += 1        
