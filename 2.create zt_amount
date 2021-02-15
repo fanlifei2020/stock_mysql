@@ -128,7 +128,7 @@ with engine.connect() as con:
     
 #如果全部新建，需要用此段
 sql2 = """
-    create table zt as select * from daily where ((pct_chg>9.9 and pct_chg<10.1) or (pct_chg>19.9 and pct_chg<20.1)) and high<close*1.005;
+    create table zt as select * from daily where ((pct_chg>9.8 and pct_chg<10.5) or (pct_chg>19.9 and pct_chg<20.1)) and high<close*1.005;
 """
 with engine.connect() as con:
     con.execute(sql2)
