@@ -47,7 +47,7 @@ def get_amount(series):
  
     for index, row in sorted_df.iterrows():
         #print(row['trade_date']+"----"+row['ts_code'])
-        if row['pct_chg']<9.9 or (row['pct_chg']>10.1 and row['pct_chg']<19.9) or row['pct_chg']>20.1:
+        if row['pct_chg']<9.8 or (row['pct_chg']>10.5 and row['pct_chg']<19.9) or row['pct_chg']>20.1:
             #print("涨幅判断未涨停，退出",end=',')
             return count
         if row['high']>row['close']*1.005:
