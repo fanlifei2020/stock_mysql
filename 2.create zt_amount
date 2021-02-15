@@ -1,3 +1,5 @@
+#涨停的标准，有9.89一字板的，也有10.34等涨停的入恒立实业。这种都要算进去
+
 import pandas as pd
 import numpy as np
 import tushare as ts
