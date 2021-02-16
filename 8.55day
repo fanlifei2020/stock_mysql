@@ -1,0 +1,147 @@
+def erbo(ts_code,trade_date):
+    """ unique_df = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>trade_date),:].head(30)
+    unique_df.reset_index(drop=True,inplace=True)"""
+    """    df = pro.daily(ts_code=ts_code, start_date=trade_date) 
+    df = df[:-1]
+    unique_df = df.tail(30)
+    unique_df.sort_values(by='trade_date',ascending=True,inplace=True)"""
+    
+    df_b = pro.daily(ts_code=ts_code,start_date=trade_date).tail(100)
+    df_a = pro.daily(ts_code=ts_code,end_date=trade_date).head(55).tail(54)
+    if len(df_a)<54:
+        return np.nan
+    df = df_b.append(df_a)
+    
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+    df.reset_index(drop=True,inplace=True)
+    df['55amount'] = np.nan
+    
+    amount = df['amount'].to_list()
+    #print(amount[54])
+    #print(amount)
+    #print(df.iloc[54,:])
+    #print(amount[0:55])
+    for index,row in df.iterrows():
+        if index>=54:
+            df.loc[index,"55amount"] = sum(amount[index-54:index])/55
+            #print(df.loc[index,"55amount"] )
+     
+    
+    df = df.iloc[54:,:]
+    #print(df)
+    
+    flag = 0
+    buy_price = 0
+    sell_price = 0
+    print("*********************")
+    print(ts_code,end=",")
+    print(" zt date:",trade_date)
+    #day=0
+    for index,row in df.iterrows():
+        #print(row['trade_date'],end="----")
+        #day+=1
+        if flag==0:
+            if row['amount']<row['55amount'] and row['pct_chg']>-9 and row['open']>row['close']:
+                print(row['trade_date'],end="----")
+                print("低于55日量，且收绿，第二天竞价买入")
+                flag =1
+                continue
+        if flag == 1:
+            #if day>9:
+             #   return np.nan
+            buy_price = row['open']
+            print(row['trade_date'],end="----")
+            print("买入，准备卖出")
+            flag = 2
+            continue
+        if flag ==2:
+            if row['open']<buy_price*0.95:
+                print(row['trade_date'],end="----")
+                print("止损")
+                sell_price = row['open']
+                break
+            if row['low'] <buy_price*0.95:
+                print(row['trade_date'],end="----")
+                print("止损2")
+                sell_price = buy_price*0.95
+                break
+            if row['open']>buy_price*1.1:
+                print(row['trade_date'],end="----")
+                print("止盈")
+                sell_price = row['open']
+                break
+            if row['high']>buy_price*1.1:
+                print(row['trade_date'],end="----")
+                print("止盈2")
+                sell_price = buy_price*1.1
+                break
+             
+        """if flag ==3:
+            loss_stop = row['open'] - row['pre_close']*0.03  
+            if row['low']< loss_stop:
+                #print("触发-3卖出")
+                sell_price = loss_stop
+                break
+            elif row['high'] == row['close'] or row['low'] == row['close']: 
+                #print("涨停或跌停 继续算下一天")
+                continue
+            else:
+                sell_price = row['close'] 
+                break"""
+
+    
+    
+    
+    if buy_price==0:
+        return np.nan
+    if sell_price == 0:
+        sell_price = df.iloc[-1,:]['close']
+        print(row['trade_date'],end="----")
+        print("已买入，未触发止盈止损，到日期自动卖出")
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)
+    
+    
+    
+temp= pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol'\
+                                ,'amount','limit_amount'])
+#取保留最高板
+temp.append(df.iloc[0,:])
+last_row = df.iloc[0,:]
+for index,row in df.iterrows():
+    if row['ts_code'] != last_row['ts_code']:
+        temp = temp.append(last_row)
+    last_row = row
+temp = temp.loc[temp['pct_chg']<11,:]
+end = len(temp)
+temp.reset_index(drop=True,inplace=True)
+    
+work_df = pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol','amount'])
+#stop = 0 
+for index,row in temp.iterrows():
+    """if row['trade_date']>"20210101":
+        break
+    if stop%50 == 0:
+        print("50 arived")
+        if len(work_df)!=0:
+            print("del work_df")
+            del work_df
+        if index+80<end:
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + \
+                " and trade_date<" + temp.iloc[index+80,:]['trade_date']+";"
+            work_df = pd.read_sql(work_sql,engine)
+            print("work_df created： index from,",row['trade_date'],end=",")
+            print("index+80:",temp.iloc[index+80,:]['trade_date'])
+     
+        else:
+            work_sql = "select * from daily where trade_date>=" + row['trade_date'] + \
+                " and trade_date<=" + temp.iloc[end-1,:]['trade_date']+";"
+            work_df = pd.read_sql(work_sql,engine)
+            print("work_df created： index from,",row['trade_date'],end=",")
+            print("index+80:",temp.iloc[end-1,:]['trade_date'])
+     """
+    result = erbo(row['ts_code'],row['trade_date'])
+    print("result",result)
+    temp.loc[index,"erbo"] = result
+    print("temp erbo added:", temp.loc[index,"erbo"] )
+    #stop += 1        
