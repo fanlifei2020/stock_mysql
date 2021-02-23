@@ -30,7 +30,7 @@ def erbo(ts_code,trade_date,limit_amount=0):
     df_a = pro.daily(ts_code=ts_code,end_date=trade_date).head(15).tail(14)
     if len(df_a)<14:
         return np.nan
-    df = df_b.append(df_a)"""
+    df = df_a.append(df_b)"""
     
     df_b = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>=trade_date),:].head(30)
     df_a = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']<trade_date),:].tail(14)
