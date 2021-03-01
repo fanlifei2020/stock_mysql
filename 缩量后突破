@@ -1,0 +1,119 @@
+
+def erbo(ts_code,trade_date,limit_amount=0):
+    
+    #取得15天日线，涨停后加上一天，计算第二高度，加上一天，计算第二高度
+    
+    
+    df_b = pro.daily(ts_code=ts_code,start_date=trade_date).tail(30)
+    df_a = pro.daily(ts_code=ts_code,end_date=trade_date).head(15).tail(14)
+  
+    
+    """df_b = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>=trade_date),:].head(30)
+    df_a = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']<trade_date),:].tail(14)
+  """
+     
+     
+    if len(df_a)<14:
+        return np.nan
+    df = df_a.append(df_b)
+    
+    
+  
+    #df.sort_values(by='trade_date',ascending=True,inplace=True)
+     
+     
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+    df.reset_index(drop=True,inplace=True)
+     
+    
+    #print("amount_list:",amount_list)
+    df['5amount'] = np.nan
+    df['10amount'] = np.nan
+    amount = df['amount'].to_list()
+     
+    #求得5、10日量
+    for index,row in df.iterrows():
+        if index>=4:
+            #print("sum:",amount[index-4:index+1])
+            df.loc[index,"5amount"] = sum(amount[index-4:index+1])/5
+            #print(df.loc[index,"5amount"] )
+    for index,row in df.iterrows():
+        if index>=9:
+            df.loc[index,"10amount"] = sum(amount[index-9:index+1])/10
+            
+    #从未涨停当日为第0行
+    calcu_df = df.iloc[15:,:]
+    calcu_df.reset_index(drop=True,inplace=True)
+    #print(calcu_df)
+    
+    flag = 0
+    buy_price = 0
+    sell_price = 0
+    print("*********************")
+    print(ts_code,end=",")
+    print(" zt date:",trade_date,end=",")
+    print("limit_amount:",limit_amount)
+    day=0
+    low = 500
+    high = 0 
+    zdt = 0
+   
+    for index,row in calcu_df.iterrows():
+        body = (row['close']-row['open'])/row['pre_close']*100
+        
+        if flag==0:
+            
+            if row['amount']<row['5amount'] and row['open']>=row['close']:
+                print(row['trade_date'],end="----")
+                print("找到缩量绿")
+                high=row['high']
+                flag=1
+                continue
+        if flag ==1:
+             
+            if row['high']>high:
+                print(row['trade_date'],end="----")
+                print("有突破，买入")
+                buy_price = high
+                if row['open']>high:
+                    print(row['trade_date'],end="----")
+                    print("买入为竞价突破")
+                    buy_price=row['open']
+                flag=2
+                if row['pct_chg']>9 or row['pct_chg']<-9:
+                    print(row['trade_date'],end="----")
+                    print("买入即涨停或跌停")
+                    flag=4   
+                continue
+            else:
+                flag=0
+        if flag==2:
+             
+             
+                print("竞价卖出")
+                sell_price = row['open']
+                break
+             
+        if flag==4:
+            if row['pct_chg']>9 or row['pct_chg']<-9:
+                print(row['trade_date'],end="----")
+                print("涨跌停持有")
+                flag = 4
+            else:
+                print(row['trade_date'],end="----")
+                sell_price = row['close'] 
+                print("尾盘卖出")
+                break
+            
+                
+
+       
+    if buy_price==0:
+        print("未出现买点，退出")
+        return np.nan
+    if sell_price == 0:
+        sell_price = calcu_df.iloc[-1,:]['close']
+        print(row['trade_date'],end="----")
+        print("已买入，未触发止盈止损，到日期自动卖出")
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)
