@@ -1,0 +1,140 @@
+#%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import tushare as ts
+from time import sleep
+from sqlalchemy import create_engine
+import sqlalchemy
+import pymysql
+import os
+import datetime
+
+#得到当天日期
+today=datetime.date.today()
+formatted_today=today.strftime('%y%m%d')
+today = '20' + formatted_today
+
+pro = ts.pro_api('7d1f3465439683e262b5b06a8aaefa886ea48aafe2cda73c130beb97')
+#df = pro.trade_cal(exchange='', start_date='20180101', end_date='20181231')
+#data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
+#df = pro.daily(ts_code='000001.SZ,600000.SH', start_date='20180701', end_date='20180718')
+#df = pro.daily(trade_date='20180810')
+
+
+trade_day = pro.trade_cal(exchange='', start_date="20040601",end_date=today)
+trade_day = trade_day.loc[trade_day['is_open']==1,:]
+trade_day = trade_day[['cal_date']]
+trade_day.columns = ['day']
+tradeday = trade_day['day'].to_list()
+
+def get_strong(num):
+    df_1 =  pro.daily(trade_date=tradeday[-1-num])
+    df_1limit = df_1.loc[df_1['pct_chg']>9,:]
+    df_2 = pro.daily(trade_date=tradeday[-2-num])
+    df_2limit = df_2.loc[df_2['pct_chg']>9,:]
+    df_3 = pro.daily(trade_date=tradeday[-3-num])
+    df_3limit = df_3.loc[df_3['pct_chg']>9,:]
+    df_4 = pro.daily(trade_date=tradeday[-4-num])
+    df_4limit = df_4.loc[df_4['pct_chg']>9,:]
+    
+    if len(df_1)!=0:
+        result = pd.merge(df_1limit,df_2limit[['ts_code']],on='ts_code',how='inner')
+        result = pd.merge(result,df_3limit[['ts_code']],on='ts_code',how='inner')
+        if len(result)==0:
+            print("没有三板")
+            result = pd.merge(df_1limit,df_2limit[['ts_code']],on='ts_code',how='inner')
+    """else:
+        result = pd.merge(df_2limit,df_3limit[['ts_code']],on='ts_code',how='inner')
+        result = pd.merge(result,df_4limit[['ts_code']],on='ts_code',how='inner')
+        if len(result)==0:
+            print("没有三板")
+            result = pd.merge(df_1limit,df_2limit[['ts_code']],on='ts_code',how='inner')"""
+   
+    return result
+
+    
+    
+def get_amount(series):
+#取得15天日线,从涨停当天开始往前推算
+     
+    df = pro.daily(ts_code=series['ts_code'], end_date=series['trade_date']).head(15)
+    #df.sort_values(by='trade_date',ascending=True,inplace=True)
+    #print("15日df created")
+    
+    #df = pd.read_sql(sql,engine)
+    #print(df)
+    #print("\n")
+    count = 0
+    flag = 0
+    #print('ts_code:',row['ts_code'])
+ 
+    for index, row in df.iterrows():
+        #print(row['trade_date']+"----"+row['ts_code'])
+        if row['pct_chg']<9.8 or (row['pct_chg']>10.5 and row['pct_chg']<19.9) or row['pct_chg']>20.1:
+            #print("涨幅判断未涨停，退出",end=',')
+            return count
+        if row['high']>row['close']*1.005:
+            #print("最高价大于收盘价判断未涨停，退出",end=',')
+            return count
+        
+        #以下都是涨停板
+        if row['low'] == row['high']:
+            #print("一字板,flag+")
+            if row['pct_chg']<10.1:
+                flag = flag + 1
+                #print("flag=",flag)
+            else:
+                flag = flag + 2
+                #print("flag=",flag)
+        else:
+            #非一字板，包括自然板和T字板
+            #不用有量无量判断，因为有接近无量的自然板
+            
+            if row['open']==row['high']:
+                if row['amount']>30000:
+                #金额大于3千万，有量T字板,当自然板算
+                    #print('有量T字板',end=',')
+                    if row['pct_chg']<10.1:
+                        count = count + 1 + flag
+                        flag=0
+                        #print("count=",count)
+                    else:
+                        count = count + 2 + flag
+                        flag=0
+                        #print("count=",count)
+                else:
+                #无量T字板
+                    #print('无量T字板')
+                    if row['pct_chg']<10.1:
+                        flag = flag + 1
+                        #print("flag=",flag)
+                    else:
+                        flag = flag + 2
+                        #print("flag=",flag)
+            else:
+                #非T字板
+                #print('自然板，结算',end=',')
+                if row['pct_chg']<10.1:
+                    count = count + 1 + flag
+                    flag=0
+                    #print("count=",count)
+                else:
+                    count = count + 2 + flag
+                    flag=0
+                    #print("count=",count)
+            
+    #print("count=",count)
+    return count
+    
+temp= pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol'\
+                                ,'amount','limit'])
+for index,value in enumerate(tradeday[-6:]):
+        print(index)
+        result = get_strong(index)
+        result['limit'] = result.apply(get_amount,axis=1)
+        df2 = result.groupby('trade_date',as_index=False).apply(lambda t: t[t.limit==t.limit.max()])
+        print(df2)
+        temp = temp.append(df2)
+        
+        
