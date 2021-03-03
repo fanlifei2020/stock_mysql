@@ -1,0 +1,183 @@
+#%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import tushare as ts
+from time import sleep
+from sqlalchemy import create_engine
+import sqlalchemy
+import pymysql
+import os
+import datetime
+
+#得到当天日期
+today=datetime.date.today()
+formatted_today=today.strftime('%y%m%d')
+today = '20' + formatted_today
+
+pro = ts.pro_api('7d1f3465439683e262b5b06a8aaefa886ea48aafe2cda73c130beb97')
+#df = pro.trade_cal(exchange='', start_date='20180101', end_date='20181231')
+#data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
+#df = pro.daily(ts_code='000001.SZ,600000.SH', start_date='20180701', end_date='20180718')
+#df = pro.daily(trade_date='20180810')
+
+
+def erbo(ts_code,trade_date,limit_amount=0):
+    
+    #取得15天日线，涨停后加上一天，计算第二高度，加上一天，计算第二高度
+    
+    
+    df_b = pro.daily(ts_code=ts_code,start_date=trade_date).tail(30)
+    df_a = pro.daily(ts_code=ts_code,end_date=trade_date).head(15).tail(14)
+  
+    
+    """df_b = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']>=trade_date),:].head(30)
+    df_a = work_df.loc[(work_df['ts_code']==ts_code)&(work_df['trade_date']<trade_date),:].tail(14)
+  """
+     
+     
+    if len(df_a)<14:
+        return np.nan
+    df = df_a.append(df_b)
+    
+    
+  
+    #df.sort_values(by='trade_date',ascending=True,inplace=True)
+     
+     
+    df.sort_values(by='trade_date',ascending=True,inplace=True)
+    df.reset_index(drop=True,inplace=True)
+     
+    
+    #print("amount_list:",amount_list)
+    df['5amount'] = np.nan
+    df['10amount'] = np.nan
+    amount = df['amount'].to_list()
+     
+    #求得5、10日量
+    for index,row in df.iterrows():
+        if index>=4:
+            #print("sum:",amount[index-4:index+1])
+            df.loc[index,"5amount"] = sum(amount[index-4:index+1])/5
+            #print(df.loc[index,"5amount"] )
+    for index,row in df.iterrows():
+        if index>=9:
+            df.loc[index,"10amount"] = sum(amount[index-9:index+1])/10
+            
+    #从未涨停当日为第0行
+    calcu_df = df.iloc[15:,:]
+    calcu_df.reset_index(drop=True,inplace=True)
+    #print(calcu_df)
+    
+    flag = 0
+    buy_price = 0
+    sell_price = 0
+    print("*********************")
+    print(ts_code,end=",")
+    print(" zt date:",trade_date,end=",")
+    print("limit_amount:",limit_amount)
+    day=0
+    low = 500
+    high = 0 
+    zdt = 0
+    buy_day =0
+    for index,row in calcu_df.iterrows():
+        if index==0:
+            continue
+        if flag ==0:
+            if day>10:
+                break
+            day+=1
+            if row['open']<row['pre_close']*0.99:
+                print(row['trade_date'],end="----")
+                print("-1以下低开")
+                if row['high']>row['pre_close']:
+                    own_day.append(row['trade_date'])
+                    print("最高点过0轴，0轴买入")
+                    buy_price = row['pre_close']
+                    flag=1
+                    continue
+                else:
+                    print("无买点，继续")
+        if flag ==1:
+            buy_day += 1
+            own_day.append(row['trade_date'])
+            if row['pct_chg']>9 or row['pct_chg']<-9:
+                print(row['trade_date'],end="----")
+                print("涨跌停持有")
+                flag = 4
+                continue
+            if row['amount']>row['5amount']:
+                print(row['trade_date'],end="----")
+                print("大于5日量",end=",")
+                print("尾盘卖出")
+                sell_price = row['close']
+                break
+            if buy_day>3:
+                print(row['trade_date'],end="----")
+                print("买入后过了3天还没出现卖点",end=",")
+                print("尾盘卖出")
+                sell_price = row['close']
+                break
+                 
+        
+      
+        if flag ==4:
+            own_day.append(row['trade_date'])
+            """loss_stop = row['open'] - row['pre_close']*0.03  
+            if row['low']< loss_stop:
+                print("触发-3卖出")
+                sell_price = loss_stop
+                break"""
+            if row['pct_chg']>9 or row['pct_chg']<-9:
+                print(row['trade_date'],end="----")
+                """row['high'] == row['close'] or row['low'] == row['close']: """
+                print("涨停或跌停 继续算下一天")
+                continue
+            else:
+                print(row['trade_date'],end="----")
+                sell_price = row['close'] 
+                print("尾盘卖出")
+                break
+        
+        
+    if buy_price==0:
+        print("未出现买点，退出")
+        return np.nan
+    if sell_price == 0:
+        sell_price = calcu_df.iloc[-1,:]['close']
+        print(row['trade_date'],end="----")
+        print("已买入，未触发止盈止损，到日期自动卖出")
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)
+ 
+ 
+ engine = create_engine('mysql+pymysql://root:901113@localhost:3306/stock')
+sql = """
+    select * from unique_stock;
+"""
+df = pd.read_sql(sql, engine)
+df = df.loc[df['pct_chg']<12,:]
+df = df.loc[df['trade_date']>'20080101',:]
+
+
+
+temp= pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol'\
+                                ,'amount','limit_amount','open_profit'])
+ #取保留最高板
+temp.append(df.iloc[0,:])
+last_row = df.iloc[0,:]
+for index,row in df.iterrows():
+    if row['ts_code'] != last_row['ts_code']:
+        temp = temp.append(last_row)
+    last_row = row
+end = len(temp)
+temp.reset_index(drop=True,inplace=True)
+
+
+own_day=[]
+for index,row in temp.iterrows():
+    result = erbo(row['ts_code'],row['trade_date'],row['limit_amount'])
+    temp.loc[index,"erbo"] = result
+    print("temp erbo added:", temp.loc[index,"erbo"] )
+    
