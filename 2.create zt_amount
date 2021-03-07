@@ -59,7 +59,7 @@ def get_amount(series):
         #以下都是涨停板
         if row['low'] == row['high']:
             #print("一字板,flag+")
-            if row['pct_chg']<10.1:
+            if row['pct_chg']<10.5:
                 flag = flag + 1
                 #print("flag=",flag)
             else:
@@ -73,7 +73,7 @@ def get_amount(series):
                 if row['amount']>30000:
                 #金额大于3千万，有量T字板,当自然板算
                     #print('有量T字板',end=',')
-                    if row['pct_chg']<10.1:
+                    if row['pct_chg']<10.5:
                         count = count + 1 + flag
                         flag=0
                         #print("count=",count)
@@ -84,7 +84,7 @@ def get_amount(series):
                 else:
                 #无量T字板
                     #print('无量T字板')
-                    if row['pct_chg']<10.1:
+                    if row['pct_chg']<10.5:
                         flag = flag + 1
                         #print("flag=",flag)
                     else:
@@ -93,7 +93,7 @@ def get_amount(series):
             else:
                 #非T字板
                 #print('自然板，结算',end=',')
-                if row['pct_chg']<10.1:
+                if row['pct_chg']<10.5:
                     count = count + 1 + flag
                     flag=0
                     #print("count=",count)
