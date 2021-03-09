@@ -1,0 +1,125 @@
+#跌停一天不买
+def is_dt(ts_code,trade_date,limit_amount=0):
+    print('123')
+    unique_df =  pro.daily(ts_code=ts_code,start_date=trade_date).tail(15).head(14)
+    unique_df.sort_values(by='trade_date',ascending=True,inplace=True)
+    unique_df.reset_index(drop=True,inplace=True)
+    flag = 0
+    for index,row in unique_df.iterrows():
+        if flag == 0:
+            if row['pct_chg']<-9:
+                flag = 1
+                continue
+        if flag == 1:
+            dtday.append(row['trade_date'])
+            if row['pct_chg']<-9:
+                continue
+            else:
+                flag = 0
+                continue
+#跌停二天不买
+"""def is_dt(ts_code,trade_date,limit_amount=0):
+    unique_df =  pro.daily(ts_code=ts_code,start_date=trade_date).tail(15).head(14)
+    unique_df.sort_values(by='trade_date',ascending=True,inplace=True)
+    unique_df.reset_index(drop=True,inplace=True)
+    flag = 0
+    for index,row in unique_df.iterrows():
+        if flag == 0:
+            if row['pct_chg']<-9:
+                flag = 1
+                continue
+        if flag == 1:
+            dtday.append(row['trade_date'])
+            if row['pct_chg']<-9:
+                flag =2
+                continue
+            else:
+                flag = 0
+                continue
+        if flag==2:
+            dtday.append(row['trade_date'])
+            if row['pct_chg']<-9:
+                flag =1
+                continue
+            else:
+                flag = 0
+                continue"""
+
+            
+
+
+
+
+def yibo(ts_code,trade_date,limit_amount=0):
+    unique_df =  pro.daily(ts_code=ts_code,start_date=trade_date).tail(15).head(14)
+    
+    unique_df.sort_values(by='trade_date',ascending=True,inplace=True)
+    unique_df.reset_index(drop=True,inplace=True)
+    
+    flag = 0
+    buy_price =0
+    sell_price=0
+    for index,row in unique_df.iterrows():
+        print(row['trade_date'],end=",")
+        if flag ==0:
+            if row['pct_chg']>9:
+                print('当天涨停',end=",")
+                if row['open']<row['pre_close']*1.085:
+                    print("非一字开，买入")
+                    buy_price = row['open']
+                    flag = 1
+                    continue
+                else:
+                    print("一字开，继续")
+                    continue
+            else:
+                print('当天未涨停',end=",")
+                if row['open']<row['pre_close']*1.085:
+                    print("非一字开，买入")
+                    buy_price = row['open']
+                    flag = 1
+                    continue
+                else:
+                    print("一字开，退出")
+                    break
+        if flag ==1:
+            if row['pct_chg']>9:
+                print('涨停继续')
+            elif row['pct_chg']<-9:
+                print('跌停继续')
+            else:
+                print('尾盘卖出')
+                sell_price = row['close']
+                break
+        #-3卖出才用到
+        if flag==2:
+            loss = row['open']-row['pre_close']*0.03
+            if loss<row['low']:
+                print("-3止损小于最低点",end=",")
+                if row['pct_chg']>9 or row['pct_chg']<-9:
+                    print('当天涨停或跌停')
+                    flag =1
+                    continue
+                else:
+                    print("当天未涨跌停，尾盘卖")
+                    sell_price = row['close']
+                    break
+            else:
+                print("-3止损")
+                sell_price = loss
+                break
+        
+                
+    if buy_price==0:
+        print("未出现买点，退出")
+        return np.nan
+    if sell_price == 0:
+        sell_price = unique_df.iloc[-1,:]['close']
+        print(row['trade_date'],end="----")
+        print("已买入，未触发止盈止损，到日期自动卖出")
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)   
+                    
+                
+            
+            
