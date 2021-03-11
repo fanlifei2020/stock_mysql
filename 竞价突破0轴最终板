@@ -1,0 +1,261 @@
+#%matplotlib inline
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import tushare as ts
+from time import sleep
+from sqlalchemy import create_engine
+import sqlalchemy
+import pymysql
+import os
+import datetime
+
+#得到当天日期
+today=datetime.date.today()
+formatted_today=today.strftime('%y%m%d')
+today = '20' + formatted_today
+
+pro = ts.pro_api('7d1f3465439683e262b5b06a8aaefa886ea48aafe2cda73c130beb97')
+#df = pro.trade_cal(exchange='', start_date='20180101', end_date='20181231')
+#data = pro.stock_basic(exchange='', list_status='L', fields='ts_code,symbol,name,area,industry,list_date')
+#df = pro.daily(ts_code='000001.SZ,600000.SH', start_date='20180701', end_date='20180718')
+#df = pro.daily(trade_date='20180810')
+
+
+
+
+def yibo(ts_code,trade_date,limit_amount=0):
+    unique_df =  pro.daily(ts_code=ts_code,start_date=trade_date).tail(15).head(14)
+    
+    unique_df.sort_values(by='trade_date',ascending=True,inplace=True)
+    unique_df.reset_index(drop=True,inplace=True)
+    
+    flag = 0
+    buy_price =0
+    sell_price=0
+    for index,row in unique_df.iterrows():
+        print(row['trade_date'],end=",")
+        
+        if flag ==0:
+            if row['pct_chg']>9 :
+                print('当天涨停',end=",")
+                if row['high']>row['pre_close'] and row['open']<row['pre_close']*0.99  :
+                    print("有买点，买入")
+                    buy_price = row['pre_close']
+                    flag = 1
+                    continue
+                else:
+                    print('无买点，继续')
+                    continue
+            elif  row['pct_chg']<-9 :
+                print('当天跌停',end=",")
+                if row['high']>row['pre_close'] and row['open']<row['pre_close']*0.99  :
+                    print("有买点，买入")
+                    buy_price = row['pre_close']
+                    flag = 1
+                    continue
+                else:
+                    print('无买点，退出')
+                    break
+            else:
+                print("当天未涨跌停",end=",")
+                if row['high']>row['pre_close'] and row['open']<row['pre_close']*0.99:
+                    print("有买点，买入")
+                    buy_price = row['pre_close']
+                    flag = 1
+                    continue
+                else:
+                    print('无买点，退出')
+                    break
+        if flag ==1:
+            if row['pct_chg']>9:
+                print('涨停继续')
+            elif row['pct_chg']<-9:
+                print('跌停继续')
+            else:
+                print('尾盘卖出')
+                sell_price = row['close']
+                break
+        #-3卖出才用到
+        if flag==2:
+            loss = row['open']-row['pre_close']*0.03
+            if loss<row['low']:
+                print("-3止损小于最低点",end=",")
+                if row['pct_chg']>9 or row['pct_chg']<-9:
+                    print('当天涨停或跌停')
+                    flag =1
+                    continue
+                else:
+                    print("当天未涨跌停，尾盘卖")
+                    sell_price = row['close']
+                    break
+            else:
+                print("-3止损")
+                sell_price = loss
+                break
+        
+                
+    if buy_price==0:
+        print("未出现买点，退出")
+        return np.nan
+    if sell_price == 0:
+        sell_price = unique_df.iloc[-1,:]['close']
+        print(row['trade_date'],end="----")
+        print("已买入，未触发止盈止损，到日期自动卖出")
+    rate = (sell_price - buy_price)/buy_price*100
+    return round(rate,2)   
+                    
+                    
+                    
+                    
+                    
+
+def yibo_open(ts_code,trade_date,limit_amount=0):
+    unique_df =  pro.daily(ts_code=ts_code,start_date=trade_date).tail(15).head(14)
+    
+    unique_df.sort_values(by='trade_date',ascending=True,inplace=True)
+    unique_df.reset_index(drop=True,inplace=True)
+    
+    flag = 0
+    buy_price =0
+    sell_price=0
+    for index,row in unique_df.iterrows():
+        print(row['trade_date'],end=",")
+        
+        if flag ==0:
+            if row['pct_chg']>9 :
+                print('当天涨停',end=",")
+                if row['high']>row['pre_close'] and row['open']<row['pre_close']*0.99  :
+                    print("有买点，买入")
+                    buy_price = row['pre_close']
+                    rate = (row['open']-row['pre_close'])/row['pre_close']*100
+                    flag = 1
+                    break
+                else:
+                    print('无买点，继续')
+                    continue
+            elif  row['pct_chg']<-9 :
+                print('当天跌停',end=",")
+                if row['high']>row['pre_close'] and row['open']<row['pre_close']*0.99  :
+                    print("有买点，买入")
+                    buy_price = row['pre_close']
+                    flag = 1
+                    rate = (row['open']-row['pre_close'])/row['pre_close']*100
+                    break
+                else:
+                    print('无买点，退出')
+                    break
+            else:
+                print("当天未涨跌停",end=",")
+                if row['high']>row['pre_close'] and row['open']<row['pre_close']*0.99:
+                    print("有买点，买入")
+                    buy_price = row['pre_close']
+                    rate = (row['open']-row['pre_close'])/row['pre_close']*100
+                    flag = 1
+                    break
+                else:
+                    print('无买点，退出')
+                    break
+         
+        
+                
+    if buy_price==0:
+        print("未出现买点，退出")
+        return np.nan
+     
+    
+    return round(rate,2)   
+                    
+                    
+                     
+engine = create_engine('mysql+pymysql://root:901113@localhost:3306/stock')
+sql = """
+    select * from unique_stock2;
+"""
+df = pd.read_sql(sql, engine)
+df = df.loc[df['pct_chg']<12,:]
+df = df.loc[df['trade_date']>'20100101',:]
+
+temp= pd.DataFrame(columns=['ts_code','trade_date','open','high','low','close','pre_close','change','pct_chg','vol'\
+                                ,'amount','limit_amount','open_profit'])
+ 
+    
+#连续涨停的唯一，保留第一板
+flag = ""
+for index,row in df.iterrows():
+    if row['ts_code'] != flag:
+        temp = temp.append(row)
+        flag = row['ts_code']
+    else:
+        continue
+        
+   own_day=[]
+for index,row in temp.iterrows():
+    print("************")
+    print(row['trade_date'],end=",")
+    print(row['ts_code'],end=",")
+    print(row['limit_amount'])
+    result = yibo(row['ts_code'],row['trade_date'],row['limit_amount'])
+    temp.loc[index,"yibo"] = result
+    print("temp yibo added:", temp.loc[index,"yibo"] )
+    
+    
+    
+    
+    
+for index,row in temp.iterrows():
+    print("************")
+    print(row['trade_date'],end=",")
+    print(row['ts_code'],end=",")
+    print(row['limit_amount'])
+    result = yibo_open(row['ts_code'],row['trade_date'],row['limit_amount'])
+    temp.loc[index,"yibo_open"] = result
+    print("temp yibo_open added:", temp.loc[index,"yibo_open"] )
+    
+    temp.loc[temp['yibo']<-15,:]
+    
+    
+    
+    temp = temp.loc[temp['yibo']<100,:]
+
+temp.yibo.sum()
+
+
+
+
+def draw_result(df):
+    df = temp
+    df['cumsum'] = temp.yibo.cumsum()
+    top = df['cumsum'].max()+20
+    bottom = df['cumsum'].min()-20
+    
+    plt.rcParams['font.sans-serif'] = ['SimHei']
+    plt.rcParams['axes.unicode_minus'] = False
+    plt.figure(figsize=(30,30),dpi=100)
+    
+    date = df['trade_date'].tolist()
+    date = [str(i) for i in date]
+    result = df['cumsum'].tolist()
+    df.reset_index(drop=True,inplace=True)
+    print(len(df))
+    plt.plot(df.index.values,result)
+    plt.xticks(np.arange(0,len(df),30),date[::30],rotation=45,size=14)
+    plt.yticks(np.arange(bottom,top,20),size=16)
+    fig = plt.gcf()
+    fig.set_size_inches(60,20)
+    plt.grid(ls='--',c='darkblue')
+    plt.savefig("result.jpg")
+    plt.show()
+    
+    
+    
+draw_result(temp)
+
+
+
+rate_list = temp.yibo.to_list()
+result = 1
+for i in rate_list:
+    result = result*(1+i/100)
+    #print(1+i/100)
+    print(result,end=",")
